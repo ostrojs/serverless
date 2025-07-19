@@ -1,0 +1,31 @@
+{
+  "name": "@ostro/serverless",
+  "version": "1.0.0", 
+  "description": "Serverless module for OstroJS",
+  "main": "serverless.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node serverless.js"
+  },
+  "dependencies": {
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "engineStrict": true,
+  "keywords": [
+    "serverless",
+    "nodejs serverless",
+    "lambda"
+  ],
+  "author": "amar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ostrojs/serverless.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ostrojs/serverless/issues"
+  },
+  "homepage": "https://github.com/ostrojs/serverless#readme"
+}
