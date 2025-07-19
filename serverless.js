@@ -1,9 +1,31 @@
+const StreamRequest = require('./stream/request');
+const StreamResponse = require('./stream/response');
 class Serverless {
-  constructor(config) {
-    this.$config = config;
-    this.$request = null;
-    this.$response = null;
-    this.$handler = null;
+  constructor() {
+    this.stream();
+  }
+
+  stream(request = StreamRequest, response = StreamResponse) {
+    if (typeof request != 'function') {
+      throw new Error('Request class must be function/class');
+    }
+    if (typeof response != 'function') {
+      throw new Error('Response class must function/class');
+    }
+    Object.defineProperties(this, {
+      $streamRequest: {
+        value: request,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      },
+      $streamResponse: {
+        value: response,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      }
+    });
   }
 
   request(HttpRequest) {
@@ -24,18 +46,24 @@ class Serverless {
     Object.defineProperty(this, '$handler', { value: handler })
   }
 
-  handle(Request = require('./stream/request'), Response = require('./stream/response')) {
+  handle() {
     return async (event, context) => {
       return new Promise((resolve) => {
-        const request = new this.$request(Request.fromEvent(event));
+        const request = new this.$request(this.$streamRequest.fromEvent(event));
         request.context = context;
-        const response = new this.$response(new Response(resolve))
+        const response = new this.$response(new this.$streamResponse(resolve))
         this.$handler(request, response, (err) => {
           this.next(err, resolve);
         });
       });
     };
   }
+
+  handler(event, context) {
+    return this.handle()(event, context);
+
+  }
+
   next(err, resolve) {
     if (err) {
       console.error('Middleware error:', err);
