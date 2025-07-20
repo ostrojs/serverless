@@ -1,8 +1,15 @@
+const { values } = require('lodash');
 const StreamRequest = require('./stream/request');
 const StreamResponse = require('./stream/response');
 class Serverless {
   constructor() {
     this.stream();
+    Object.defineProperty(this, "handler", {
+      value: (event, context) => {
+        return this.handle()(event, context);
+
+      }
+    })
   }
 
   stream(request = StreamRequest, response = StreamResponse) {
@@ -57,11 +64,6 @@ class Serverless {
         });
       });
     };
-  }
-
-  handler(event, context) {
-    return this.handle()(event, context);
-
   }
 
   next(err, resolve) {
