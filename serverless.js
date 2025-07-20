@@ -1,13 +1,14 @@
 const { values } = require('lodash');
 const StreamRequest = require('./stream/request');
 const StreamResponse = require('./stream/response');
+
 class Serverless {
   constructor() {
     this.stream();
+    const handler = this.handle()
     Object.defineProperty(this, "handler", {
       value: (event, context) => {
-        return this.handle()(event, context);
-
+        return handler(event, context);
       }
     })
   }
@@ -54,16 +55,39 @@ class Serverless {
   }
 
   handle() {
-    return async (event, context) => {
+    this.loadMain(process.cwd() + '/serverless.js');
+    return (event, context) => {
       return new Promise((resolve) => {
         const request = new this.$request(this.$streamRequest.fromEvent(event));
         request.context = context;
         const response = new this.$response(new this.$streamResponse(resolve))
+        Object.defineProperty(response, 'req', { value: request })
         this.$handler(request, response, (err) => {
           this.next(err, resolve);
         });
       });
+
     };
+  }
+  loadMain(mainModulePath) {
+    // Resolve the absolute path to the main module
+    const mainPath = path.resolve(mainModulePath);
+
+    // Load the module manually
+    const mainModule = require(mainPath);
+
+    // Monkey patch require.main to simulate the main module
+    Object.defineProperty(require, 'main', {
+      value: require.cache[mainPath] || null,
+      writable: false,
+      configurable: false,
+      enumerable: true
+    });
+
+    // Also set process.mainModule for compatibility (deprecated but still used sometimes)
+    process.mainModule = require.main;
+
+    return mainModule;
   }
 
   next(err, resolve) {
