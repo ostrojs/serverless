@@ -1,101 +1,72 @@
-const { ServerResponse } = require('http');
-const { Writable } = require('stream');
-const { normalizeHeaders } = require('../utils');
-
-class Response extends ServerResponse {
-  constructor(resolve, platform, getwayType) {
-    super({ writable: true } instanceof Writable ? { writable: true } : new Writable());
-
-    this._resolve = resolve;
-    this._chunks = [];
-    this.$isBase64Encoded = true;
-    this._platform = platform;
-    this._getwayType = getwayType;
-  }
-
-  write(chunk, ...args) {
-    if (typeof chunk === 'string') {
-      this._chunks.push(Buffer.from(chunk));
-    } else if (Buffer.isBuffer(chunk)) {
-      this._chunks.push(chunk);
+exports.normalizeHeadersGeneral = function normalizeHeaders(headers) {
+  const normalized = {};
+  for (const key in headers) {
+    if (Array.isArray(headers[key])) {
+      normalized[key] = headers[key].join(', ');
     } else {
-      throw new TypeError('Response.write() expects string or Buffer');
+      normalized[key] = headers[key];
     }
   }
-
-  end(chunk, ...args) {
-    if (chunk) this.write(chunk);
-
-    const result = this.toJSON(); // Automatically uses detected platform
-    this._resolve(result);
-
-    return super.end(...args);
-  }
-
-  encode(encoding) {
-    this.$isBase64Encoded = (encoding && encoding.toLowerCase() === 'base64');
-    return this;
-  }
-
-  isBase64Encoded() {
-    return this.$isBase64Encoded;
-  }
-  isPlatform(platform){
-    platform = typeof platform === 'string' ? [platform] : platform;
-    return platform.includes(this._platform);
-  }
-
-  toJSON() {
-    const buffer = Buffer.concat(this._chunks);
-    const isBase64Encoded = this.isBase64Encoded();
-    const body = isBase64Encoded ? buffer.toString('base64') : buffer.toString('utf8');
-
-    const headers =normalizeHeaders(this.getHeaders(),this._platform,this._getwayType )
-    const cookies = '';
-    if(this.isPlatform('aws')) {
-      const setCookieKey = Object.keys(headers).find(
-        key => key.toLowerCase() === 'set-cookie'
-      );
-       cookies = setCookieKey ? headers[setCookieKey] : undefined;
-      if (setCookieKey) {
-        delete headers[setCookieKey];
-      }
-    }
-
-    const platform = this._platform;
-    const statusCode = this.statusCode || 200;
-    // Per-platform output format adjustment
-    switch (platform) {
-      case 'azure':
-        return {
-          status: statusCode,
-          headers,
-          body,
-        };
-      case 'gcp':
-        // GCP doesn't use the return value; it's streamed via `res`
-        return {
-          statusCode,
-          headers,
-          body,
-        };
-      case 'aws':
-        return {
-          statusCode,
-          headers,
-          body,
-          cookies,
-          isBase64Encoded
-        }
-      default:
-        return {
-          statusCode,
-          headers,
-          body,
-          isBase64Encoded
-        };
-    }
-  }
+  return normalized;
 }
+exports.normalizeHeaders = function normalizeHeaders(headers, platform, subtype = null) {
+  if (!headers || typeof headers !== 'object') return {};
 
-module.exports = Response;
+  const normalized = {};
+
+  // Detect whether array headers are allowed
+  const supportsArray = (() => {
+    switch (platform) {
+      case 'aws':
+        switch (subtype) {
+          case 'http':         // HTTP API Gateway v2
+          case 'alb':          // Application Load Balancer
+          case 'lambda-url':   // Direct Lambda URL
+          case 'cloudfront':   // Lambda@Edge
+            return true;
+
+          case 'rest':         // REST API Gateway v1
+            return false;
+
+          case 'event':        // SNS, SQS, CloudWatch, etc.
+            return false;
+
+          default:
+            throw new Error('AWS subtype is required: http, rest, alb, lambda-url, cloudfront, event');
+        }
+
+      case 'gcp':   // Cloud Functions, Run, Gateway
+      case 'azure': // Azure Functions, APIM
+      case 'local':
+      case 'generic':
+        return true;
+
+      default:
+        throw new Error(`Unknown platform: ${platform}`);
+    }
+  })();
+
+  // Normalize all headers to lowercase
+  for (const key in headers) {
+    if (!Object.prototype.hasOwnProperty.call(headers, key)) continue;
+
+    const lowerKey = key.toLowerCase();
+    const value = headers[key];
+
+    if (Array.isArray(value)) {
+      if (supportsArray) {
+        normalized[lowerKey] = value;
+      } else {
+        // Special case for Set-Cookie (cannot be joined with commas)
+        if (lowerKey === 'set-cookie') {
+          normalized[lowerKey] = value[0]; // Keep only first
+        } else {
+          normalized[lowerKey] = value.join(', ');
+        }
+      }
+    } else {
+      normalized[lowerKey] = value;
+    }
+  }
+  return normalized;
+}
