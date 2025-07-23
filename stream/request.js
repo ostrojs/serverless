@@ -1,14 +1,31 @@
-const { Readable } = require('stream');
+const { IncomingMessage } = require('http');
 const { URLSearchParams } = require('url');
+const { Readable } = require('stream');
+const { Duplex } = require('stream');
 
-class Request extends Readable {
-  constructor(event, context = {}, platform) {
+class MockSocket extends Duplex {
+  constructor(options = {}) {
     super();
+    this._remoteAddress = options.remoteAddress || '';
+    this.encrypted = options.encrypted || false;
+  }
 
-    this.event = event;
-    this.context = context;
-    this._source = platform;
+  get remoteAddress() {
+    return this._remoteAddress;
+  }
 
+  setRemoteAddress(addr) {
+    this._remoteAddress = addr;
+  }
+
+  _read() { }
+  _write(chunk, encoding, callback) {
+    callback();
+  }
+}
+
+class Request extends IncomingMessage {
+  constructor(event, context = {}, platform) {
     const {
       method,
       url,
@@ -16,10 +33,20 @@ class Request extends Readable {
       query,
       pathParams,
       rawBodyBuf,
-    } = this._normalize(event, context);
+      remoteAddress,
+      isEncrypted
+    } = Request._normalize(event, context, platform);
 
-    if (rawBodyBuf?.length) this.push(rawBodyBuf);
-    this.push(null); 
+    const mockSocket = new MockSocket({
+      remoteAddress,
+      encrypted: isEncrypted
+    });
+
+    super(mockSocket);
+
+    this.event = event;
+    this.context = context;
+    this._platform = platform;
 
     this.method = method || 'GET';
     this.url = url || '/';
@@ -31,29 +58,31 @@ class Request extends Readable {
     this.httpVersionMajor = 1;
     this.httpVersionMinor = 1;
 
-    this.connection = this.socket = {
-      encrypted: headers['x-forwarded-proto'] === 'https',
-      remoteAddress:
-        event.requestContext?.http?.sourceIp ||
-        headers['x-forwarded-for']?.split(',')[0] ||
-        '',
-    };
+    if (rawBodyBuf?.length) {
 
-    this.rawBody = rawBodyBuf;
-    this._platform = platform;
+      this.push(rawBodyBuf);
+    }
+    this.push(null); // always end the stream
+
+    this.body = rawBodyBuf;
+
   }
 
-  _normalize(event, context) {
+  static _normalize(event, context, platform) {
     let method = 'GET',
       url = '/',
       headers = {},
       query = {},
       pathParams = {},
       cookies = [],
-      rawBodyBuf = Buffer.alloc(0);
+      rawBodyBuf = event.body ? (event.isBase64Encoded
+        ? Buffer.from(event.body, 'base64')
+        : Buffer.from(event.body)) : Buffer.alloc(0),
+      remoteAddress = '',
+      isEncrypted = false;
 
-    switch (this._source) {
-      case 'aws_http': {
+    switch (platform) {
+      case 'aws_http':
         method = event.requestContext.http.method;
         url = event.rawPath + (event.rawQueryString ? `?${event.rawQueryString}` : '');
         headers = event.headers || {};
@@ -62,20 +91,12 @@ class Request extends Readable {
           : {};
         pathParams = event.pathParameters || {};
         cookies = event.cookies || [];
-
-        if (!headers.cookie && cookies.length > 0) {
-          headers.cookie = cookies.join('; ');
-        }
-
-        if (event.body) {
-          rawBodyBuf = event.isBase64Encoded
-            ? Buffer.from(event.body, 'base64')
-            : Buffer.from(event.body);
-        }
+        remoteAddress = event.requestContext?.http?.sourceIp ||
+          headers['x-forwarded-for']?.split(',')[0] || '';
+        isEncrypted = headers['x-forwarded-proto'] === 'https';
         break;
-      }
 
-      case 'aws_rest': {
+      case 'aws_rest':
         method = event.httpMethod;
         url = event.path;
         headers = event.headers || {};
@@ -84,20 +105,11 @@ class Request extends Readable {
         cookies = headers.Cookie
           ? headers.Cookie.split(';').map(c => c.trim())
           : [];
-
-        if (!headers.cookie && cookies.length > 0) {
-          headers.cookie = cookies.join('; ');
-        }
-
-        if (event.body) {
-          rawBodyBuf = event.isBase64Encoded
-            ? Buffer.from(event.body, 'base64')
-            : Buffer.from(event.body);
-        }
+        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '';
+        isEncrypted = headers['x-forwarded-proto'] === 'https';
         break;
-      }
 
-      case 'azure': {
+      case 'azure':
         const req = context.req || event;
         method = req.method;
         url = req.url;
@@ -107,20 +119,15 @@ class Request extends Readable {
         cookies = headers.cookie
           ? headers.cookie.split(';').map(c => c.trim())
           : [];
-
-        if (!headers.cookie && cookies.length > 0) {
-          headers.cookie = cookies.join('; ');
-        }
-
+        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '';
+        isEncrypted = headers['x-forwarded-proto'] === 'https';
         if (req.rawBody instanceof Buffer) rawBodyBuf = req.rawBody;
         else if (req.rawBody) rawBodyBuf = Buffer.from(req.rawBody);
         break;
-      }
 
-      case 'gcp': {
+      case 'gcp':
         method = event.method || event.httpMethod;
-        url =
-          event.url ||
+        url = event.url ||
           (event.path + (event.query ? '?' + new URLSearchParams(event.query).toString() : ''));
         headers = event.headers || {};
         query = event.query || {};
@@ -128,20 +135,11 @@ class Request extends Readable {
         cookies = headers.cookie
           ? headers.cookie.split(';').map(c => c.trim())
           : [];
-
-        if (!headers.cookie && cookies.length > 0) {
-          headers.cookie = cookies.join('; ');
-        }
-
-        if (event.body) {
-          rawBodyBuf = event.isBase64Encoded
-            ? Buffer.from(event.body, 'base64')
-            : Buffer.from(event.body);
-        }
+        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '';
+        isEncrypted = headers['x-forwarded-proto'] === 'https';
         break;
-      }
 
-      default: {
+      default:
         method = event.method || 'GET';
         url = event.url || '/';
         headers = event.headers || {};
@@ -150,22 +148,26 @@ class Request extends Readable {
         cookies = headers.cookie
           ? headers.cookie.split(';').map(c => c.trim())
           : [];
-
-        if (!headers.cookie && cookies.length > 0) {
-          headers.cookie = cookies.join('; ');
-        }
-
-        if (event.body) {
-          rawBodyBuf = event.isBase64Encoded
-            ? Buffer.from(event.body, 'base64')
-            : Buffer.from(event.body);
-        }
-      }
+        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '127.0.0.1';
+        isEncrypted = headers['x-forwarded-proto'] === 'https';
     }
 
-    return { method, url, headers, query, pathParams, cookies, rawBodyBuf };
-  }
+    if (!headers.cookie && cookies.length > 0) {
+      headers.cookie = cookies.join('; ');
+    }
 
+    return {
+      method,
+      url,
+      headers,
+      query,
+      pathParams,
+      cookies,
+      rawBodyBuf,
+      remoteAddress,
+      isEncrypted
+    };
+  }
 }
 
 module.exports = Request;
