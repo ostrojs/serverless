@@ -26,7 +26,8 @@ class Response extends ServerResponse {
   end(chunk, ...args) {
     if (chunk) this.write(chunk);
 
-    const result = this.toJSON(); // Automatically uses detected platform
+    const result = this.toJSON();
+
     this._resolve(result);
 
     return super.end(...args);
@@ -40,9 +41,10 @@ class Response extends ServerResponse {
   isBase64Encoded() {
     return this.$isBase64Encoded;
   }
+
   isPlatform(platform) {
     platform = typeof platform === 'string' ? [platform] : platform;
-    return platform.includes(this._platform);
+    return platform && platform.includes(this._platform);
   }
 
   toJSON() {
@@ -64,7 +66,6 @@ class Response extends ServerResponse {
 
     const platform = this._platform;
     const statusCode = this.statusCode || 200;
-    // Per-platform output format adjustment
     switch (platform) {
       case 'azure':
         return {
@@ -73,7 +74,6 @@ class Response extends ServerResponse {
           body,
         };
       case 'gcp':
-        // GCP doesn't use the return value; it's streamed via `res`
         return {
           statusCode,
           headers,
