@@ -13,6 +13,7 @@ class Serverless {
 		})
 		Object.defineProperty(this, "$platform", {
 			value: 'generic',
+			writable: true
 		})
 	}
 
