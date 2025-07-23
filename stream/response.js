@@ -1,67 +1,61 @@
+const { ServerResponse } = require('http');
 const { Writable } = require('stream');
 const { normalizeHeaders } = require('../utils');
+class Response extends ServerResponse {
 
-class Respose extends Writable {
   constructor(resolve) {
-    super();
-    this.chunks = [];
-    this.statusCode = 200;
-    this.headers = {};
+    super({ writable: true } instanceof Writable ? { writable: true } : new Writable());
     this._resolve = resolve;
+    this._chunks = [];
+    this.$isBase64Encoded = true;
   }
 
-  _write(chunk, encoding, callback) {
-    this.chunks.push(chunk);
-    callback();
-  }
-
-  writeHead(statusCode, headers) {
-    this.statusCode = statusCode;
-
-    if (headers) {
-      let parsedHeaders = {};
-
-      if (typeof headers === 'string') {
-        // Parse headers string into key-value pairs
-        headers.split('\n').forEach(line => {
-          const [key, ...rest] = line.split(':');
-          if (key && rest.length > 0) {
-            parsedHeaders[key.trim()] = rest.join(':').trim();
-          }
-        });
-      } else if (typeof headers === 'object') {
-        parsedHeaders = headers;
-      }
-
-      this.headers = { ...this.headers, ...parsedHeaders };
+  end(chunk, ...args) {
+    if (chunk) {
+      this.write(chunk);
     }
-  }
-  setHeader(key, value) {
-    this.headers[key] = value;
-  }
-
-  getHeaders() {
-    return this.headers;
-  }
-
-  getHeader(key) {
-    return this.headers[key];
-  }
-
-  _implicitHeader() {
-    if (!this.headersSent) {
-      this.headersSent = true;
+    const buffer = Buffer.concat(this._chunks)
+    const isBase64Encoded = this.isBase64Encoded();
+    const headers = this.getHeaders()
+    const setCookieKey = Object.keys(headers).find(
+      key => key.toLowerCase() === 'set-cookie'
+    );
+    let setCookieHeader = [];
+    if (setCookieKey) {
+      setCookieHeader = headers[setCookieKey];
+      delete headers[setCookieKey];
     }
-  }
-  end(chunk) {
-    if (chunk) this.write(chunk, null, () => { });
-    const body = Buffer.concat(this.chunks).toString();
     this._resolve({
       statusCode: this.statusCode,
-      headers: normalizeHeaders(this.headers),
-      body,
+      headers: normalizeHeaders(headers),
+      cookies: setCookieHeader,
+      body: isBase64Encoded ? buffer.toString('base64') : buffer.toString('utf8'),
+      isBase64Encoded,
     });
+    return super.end(...args);
   }
-}
 
-module.exports = Respose;
+  write(chunk, ...args) {
+    if (typeof chunk === 'string') {
+      this._chunks.push(Buffer.from(chunk));
+    } else {
+      this._chunks.push(chunk);
+    }
+    return super.write(chunk, ...args);
+  }
+
+  isBase64Encoded() {
+    return this.$isBase64Encoded
+  }
+
+  encode(endcodin) {
+    if (endcodin && endcodin.toLowerCase() === 'base64') {
+      this.$isBase64Encoded = true;
+    } else {
+      this.$isBase64Encoded = false;
+    }
+    return this;
+  }
+
+}
+module.exports = Response;
