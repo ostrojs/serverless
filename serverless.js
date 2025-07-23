@@ -15,6 +15,10 @@ class Serverless {
 			value: 'generic',
 			writable: true
 		})
+		Object.defineProperty(this, "$getwayType", {
+			value: '',
+			writable: true
+		})
 	}
 
 	stream(request, response) {
@@ -64,8 +68,8 @@ class Serverless {
 		}
 		return (event, context) => {
 			return new Promise((resolve) => {
-				const request = new this.$request(new this.$streamRequest(event, context, this.$platform));
-				const response = new this.$response(new this.$streamResponse(resolve, this.$platform))
+				const request = new this.$request(new this.$streamRequest(event, context, this.$platform, this.$getwayType));
+				const response = new this.$response(new this.$streamResponse(resolve, this.$platform, this.$getwayType))
 				Object.defineProperty(response, 'request', { value: request })
 				this.$handler(request, response, (err) => {
 					this.next(err, resolve);
@@ -76,6 +80,10 @@ class Serverless {
 
 	platform(platform) {
 		this.$platform = platform;
+	}
+
+	getway(getwayType) {
+		this.$getwayType = getwayType;
 	}
 
 	entry(entryPath) {
