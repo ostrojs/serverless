@@ -11,6 +11,9 @@ class Serverless {
 				return handler(event, context);
 			}
 		})
+		Object.defineProperty(this, "$plateform", {
+			value: 'generic',
+		})
 	}
 
 	stream(request, response) {
@@ -60,15 +63,18 @@ class Serverless {
 		}
 		return (event, context) => {
 			return new Promise((resolve) => {
-				const request = new this.$request(new this.$streamRequest(event));
-				request.context = context;
-				const response = new this.$response(new this.$streamResponse(resolve))
+				const request = new this.$request(new this.$streamRequest(event, context, this.$platform));
+				const response = new this.$response(new this.$streamResponse(resolve, this.$platform))
 				Object.defineProperty(response, 'req', { value: request })
 				this.$handler(request, response, (err) => {
 					this.next(err, resolve);
 				});
 			});
 		};
+	}
+
+	platform(platform) {
+		this.$platform = platform;
 	}
 
 	entry(entryPath) {
