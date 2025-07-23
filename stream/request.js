@@ -68,17 +68,17 @@ class Request extends IncomingMessage {
 
   static _normalize(event, context, platform, getwayType) {
     const request = {
-      method:'GET',
-      url:'/',
-      headers:{},
-      query:{},
-      pathParams:{},
-      cookies:[],
-      rawBodyBuf:event.body ? (event.isBase64Encoded
+      method: 'GET',
+      url: '/',
+      headers: {},
+      query: {},
+      pathParams: {},
+      cookies: [],
+      rawBodyBuf: event.body ? (event.isBase64Encoded
         ? Buffer.from(event.body, 'base64')
         : Buffer.from(event.body)) : Buffer.alloc(0),
-      remoteAddress:'',
-      isEncrypted:false
+      remoteAddress: '',
+      isEncrypted: false
     }
 
     switch (platform) {
