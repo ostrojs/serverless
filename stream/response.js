@@ -3,13 +3,14 @@ const { Writable } = require('stream');
 const { normalizeHeaders } = require('../utils');
 
 class Response extends ServerResponse {
-  constructor(resolve, platform) {
+  constructor(resolve, platform, getwayType) {
     super({ writable: true } instanceof Writable ? { writable: true } : new Writable());
 
     this._resolve = resolve;
     this._chunks = [];
     this.$isBase64Encoded = true;
     this._platform = platform;
+    this._getwayType = getwayType;
   }
 
   write(chunk, ...args) {
@@ -39,19 +40,26 @@ class Response extends ServerResponse {
   isBase64Encoded() {
     return this.$isBase64Encoded;
   }
+  isPlatform(platform){
+    platform = typeof platform === 'string' ? [platform] : platform;
+    return platform.includes(this._platform);
+  }
 
   toJSON() {
     const buffer = Buffer.concat(this._chunks);
     const isBase64Encoded = this.isBase64Encoded();
     const body = isBase64Encoded ? buffer.toString('base64') : buffer.toString('utf8');
 
-    const headers = normalizeHeaders(this.getHeaders() || {});
-    const setCookieKey = Object.keys(headers).find(
-      key => key.toLowerCase() === 'set-cookie'
-    );
-    const cookies = setCookieKey ? headers[setCookieKey] : undefined;
-    if (setCookieKey) {
-      delete headers[setCookieKey];
+    const headers =normalizeHeaders(this.getHeaders(),this._platform,this._getwayType )
+    const cookies = '';
+    if(this.isPlatform('aws')) {
+      const setCookieKey = Object.keys(headers).find(
+        key => key.toLowerCase() === 'set-cookie'
+      );
+       cookies = setCookieKey ? headers[setCookieKey] : undefined;
+      if (setCookieKey) {
+        delete headers[setCookieKey];
+      }
     }
 
     const platform = this._platform;
@@ -72,12 +80,18 @@ class Response extends ServerResponse {
           body,
         };
       case 'aws':
-      default:
         return {
           statusCode,
           headers,
           body,
           cookies,
+          isBase64Encoded
+        }
+      default:
+        return {
+          statusCode,
+          headers,
+          body,
           isBase64Encoded
         };
     }
