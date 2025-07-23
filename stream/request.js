@@ -2,12 +2,12 @@ const { Readable } = require('stream');
 const { URLSearchParams } = require('url');
 
 class Request extends Readable {
-  constructor(event, context = {}) {
+  constructor(event, context = {}, platform) {
     super();
 
     this.event = event;
     this.context = context;
-    this._source = this._detectSource(event, context);
+    this._source = platform;
 
     const {
       method,
@@ -18,11 +18,9 @@ class Request extends Readable {
       rawBodyBuf,
     } = this._normalize(event, context);
 
-    // Push the raw body into the stream
     if (rawBodyBuf?.length) this.push(rawBodyBuf);
-    this.push(null); // signal end of stream
+    this.push(null); 
 
-    // HTTP interface
     this.method = method || 'GET';
     this.url = url || '/';
     this.headers = headers || {};
@@ -33,7 +31,6 @@ class Request extends Readable {
     this.httpVersionMajor = 1;
     this.httpVersionMinor = 1;
 
-    // ✅ MOCK connection/socket for compatibility
     this.connection = this.socket = {
       encrypted: headers['x-forwarded-proto'] === 'https',
       remoteAddress:
@@ -42,16 +39,8 @@ class Request extends Readable {
         '',
     };
 
-    // Optional metadata
     this.rawBody = rawBodyBuf;
-  }
-
-  _detectSource(event, context) {
-    if (event.version === '2.0' && event.requestContext?.http) return 'aws_http';
-    if (event.requestContext?.stage && event.httpMethod) return 'aws_rest';
-    if (context.bindingData || context.invocationId) return 'azure';
-    if (event.method || event.httpMethod) return 'gcp';
-    return 'generic';
+    this._platform = platform;
   }
 
   _normalize(event, context) {
@@ -156,7 +145,7 @@ class Request extends Readable {
         method = event.method || 'GET';
         url = event.url || '/';
         headers = event.headers || {};
-        query = event.query || {};
+        query = event.rawQueryString || {};
         pathParams = event.params || {};
         cookies = headers.cookie
           ? headers.cookie.split(';').map(c => c.trim())
