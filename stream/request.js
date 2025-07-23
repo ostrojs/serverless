@@ -36,7 +36,6 @@ class Request extends IncomingMessage {
       remoteAddress,
       isEncrypted
     } = Request._normalize(event, context, platform, getwayType);
-    console.log(Request._normalize(event, context, platform, getwayType))
     const mockSocket = new MockSocket({
       remoteAddress,
       encrypted: isEncrypted
