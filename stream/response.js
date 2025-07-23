@@ -40,7 +40,7 @@ class Response extends ServerResponse {
   isBase64Encoded() {
     return this.$isBase64Encoded;
   }
-  isPlatform(platform){
+  isPlatform(platform) {
     platform = typeof platform === 'string' ? [platform] : platform;
     return platform.includes(this._platform);
   }
@@ -50,13 +50,13 @@ class Response extends ServerResponse {
     const isBase64Encoded = this.isBase64Encoded();
     const body = isBase64Encoded ? buffer.toString('base64') : buffer.toString('utf8');
 
-    const headers =normalizeHeaders(this.getHeaders(),this._platform,this._getwayType )
-    const cookies = '';
-    if(this.isPlatform('aws')) {
+    const headers = normalizeHeaders(this.getHeaders(), this._platform, this._getwayType)
+    let cookies = '';
+    if (this.isPlatform('aws')) {
       const setCookieKey = Object.keys(headers).find(
         key => key.toLowerCase() === 'set-cookie'
       );
-       cookies = setCookieKey ? headers[setCookieKey] : undefined;
+      cookies = setCookieKey ? headers[setCookieKey] : undefined;
       if (setCookieKey) {
         delete headers[setCookieKey];
       }
