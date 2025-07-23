@@ -92,7 +92,6 @@ class Serverless {
 
 	next(err, resolve) {
 		if (err) {
-			console.error('Middleware error:', err);
 			resolve({
 				statusCode: 500,
 				body: JSON.stringify({ message: 'Internal Server Error' }),
