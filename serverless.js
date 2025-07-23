@@ -12,10 +12,10 @@ class Serverless {
 			}
 		})
 		Object.defineProperty(this, "$platform", {
-			value: config?.serveress?.platform || "generic",
+			value: config?.serverless?.platform || "generic",
 		})
 		Object.defineProperty(this, "$getwayType", {
-			value: config?.serveress?.getway,
+			value: config?.serverless?.getway,
 		})
 	}
 
