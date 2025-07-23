@@ -3,8 +3,8 @@ const StreamRequest = require('./stream/request');
 const StreamResponse = require('./stream/response');
 
 class Serverless {
-	constructor(streamRequest = StreamRequest, streamResponse = StreamResponse) {
-		this.stream(streamRequest, streamResponse);
+	constructor(config) {
+		this.stream();
 		const handler = this.handle()
 		Object.defineProperty(this, "handler", {
 			value: (event, context) => {
@@ -12,16 +12,14 @@ class Serverless {
 			}
 		})
 		Object.defineProperty(this, "$platform", {
-			value: 'generic',
-			writable: true
+			value: config?.serveress?.platform || "generic",
 		})
 		Object.defineProperty(this, "$getwayType", {
-			value: '',
-			writable: true
+			value: config?.serveress?.getway,
 		})
 	}
 
-	stream(request, response) {
+	stream(request = StreamRequest, response = StreamResponse) {
 		if (typeof request != 'function') {
 			throw new Error('Request class must be function/class');
 		}
@@ -32,13 +30,11 @@ class Serverless {
 			$streamRequest: {
 				value: request,
 				writable: true,
-				configurable: true,
 				enumerable: false
 			},
 			$streamResponse: {
 				value: response,
 				writable: true,
-				configurable: true,
 				enumerable: false
 			}
 		});
@@ -76,14 +72,6 @@ class Serverless {
 				});
 			});
 		};
-	}
-
-	platform(platform) {
-		this.$platform = platform;
-	}
-
-	getway(getwayType) {
-		this.$getwayType = getwayType;
 	}
 
 	entry(entryPath) {
