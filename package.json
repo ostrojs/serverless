@@ -1,6 +1,6 @@
 {
   "name": "@ostro/serverless",
-  "version": "1.3.5", 
+  "version": "1.3.6", 
   "description": "Serverless module for OstroJS",
   "main": "serverless.js",
   "scripts": {
