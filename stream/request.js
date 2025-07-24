@@ -25,7 +25,7 @@ class MockSocket extends Duplex {
 }
 
 class Request extends IncomingMessage {
-  constructor(event, context = {}, platform) {
+  constructor(event, context = {}, platform, getwayType) {
     const {
       method,
       url,
@@ -35,8 +35,7 @@ class Request extends IncomingMessage {
       rawBodyBuf,
       remoteAddress,
       isEncrypted
-    } = Request._normalize(event, context, platform);
-
+    } = Request._normalize(event, context, platform, getwayType);
     const mockSocket = new MockSocket({
       remoteAddress,
       encrypted: isEncrypted
@@ -46,8 +45,6 @@ class Request extends IncomingMessage {
 
     this.event = event;
     this.context = context;
-    this._platform = platform;
-
     this.method = method || 'GET';
     this.url = url || '/';
     this.headers = headers || {};
@@ -62,111 +59,122 @@ class Request extends IncomingMessage {
 
       this.push(rawBodyBuf);
     }
-    this.push(null); // always end the stream
+    this.push(null);
 
     this.body = rawBodyBuf;
 
   }
 
-  static _normalize(event, context, platform) {
-    let method = 'GET',
-      url = '/',
-      headers = {},
-      query = {},
-      pathParams = {},
-      cookies = [],
-      rawBodyBuf = event.body ? (event.isBase64Encoded
+  static _normalize(event, context, platform, getwayType) {
+    const request = {
+      method: 'GET',
+      url: '/',
+      headers: {},
+      query: {},
+      pathParams: {},
+      cookies: [],
+      rawBodyBuf: event.body ? (event.isBase64Encoded
         ? Buffer.from(event.body, 'base64')
         : Buffer.from(event.body)) : Buffer.alloc(0),
-      remoteAddress = '',
-      isEncrypted = false;
+      remoteAddress: '',
+      isEncrypted: false
+    }
 
     switch (platform) {
-      case 'aws_http':
-        method = event.requestContext.http.method;
-        url = event.rawPath + (event.rawQueryString ? `?${event.rawQueryString}` : '');
-        headers = event.headers || {};
-        query = event.rawQueryString
-          ? Object.fromEntries(new URLSearchParams(event.rawQueryString))
-          : {};
-        pathParams = event.pathParameters || {};
-        cookies = event.cookies || [];
-        remoteAddress = event.requestContext?.http?.sourceIp ||
-          headers['x-forwarded-for']?.split(',')[0] || '';
-        isEncrypted = headers['x-forwarded-proto'] === 'https';
+      case 'aws':
+        switch (getwayType) {
+          case 'http':
+            request.method = event.requestContext.http.method;
+            request.url = event.rawPath + (event.rawQueryString ? `?${event.rawQueryString}` : '');
+            request.headers = event.headers || {};
+            request.query = event.rawQueryString
+              ? Object.fromEntries(new URLSearchParams(event.rawQueryString))
+              : {};
+            request.pathParams = event.pathParameters || {};
+            request.cookies = event.cookies || [];
+            request.remoteAddress = event.requestContext?.http?.sourceIp ||
+              request.headers['x-forwarded-for']?.split(',')[0] || '';
+            request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
+
+            break;
+          case 'lambda-url':
+            request.method = event.requestContext?.http?.method || 'GET';
+            request.url = event.rawPath + (event.rawQueryString ? `?${event.rawQueryString}` : '');
+            request.headers = event.headers || {};
+            request.query = event.rawQueryString
+              ? Object.fromEntries(new URLSearchParams(event.rawQueryString))
+              : {};
+            request.pathParams = event.pathParameters || {};
+            request.cookies = event.cookies || [];
+            request.remoteAddress = event.requestContext?.http?.sourceIp ||
+              request.headers['x-forwarded-for']?.split(',')[0] || '';
+            request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
+            break;
+
+          case 'rest':
+            request.method = event.httpMethod;
+            request.url = event.path;
+            request.headers = event.headers || {};
+            request.query = event.queryStringParameters || {};
+            request.pathParams = event.pathParameters || {};
+            request.cookies = request.headers.Cookie
+              ? request.headers.Cookie.split(';').map(c => c.trim())
+              : [];
+            request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '';
+            request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
+            break;
+        }
         break;
 
-      case 'aws_rest':
-        method = event.httpMethod;
-        url = event.path;
-        headers = event.headers || {};
-        query = event.queryStringParameters || {};
-        pathParams = event.pathParameters || {};
-        cookies = headers.Cookie
-          ? headers.Cookie.split(';').map(c => c.trim())
-          : [];
-        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '';
-        isEncrypted = headers['x-forwarded-proto'] === 'https';
-        break;
 
       case 'azure':
         const req = context.req || event;
-        method = req.method;
-        url = req.url;
-        headers = req.headers || {};
-        query = req.query || {};
-        pathParams = req.params || {};
-        cookies = headers.cookie
-          ? headers.cookie.split(';').map(c => c.trim())
+        request.method = req.method;
+        request.url = req.url;
+        request.headers = req.headers || {};
+        request.query = req.query || {};
+        request.pathParams = req.params || {};
+        request.cookies = request.headers.cookie
+          ? request.headers.cookie.split(';').map(c => c.trim())
           : [];
-        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '';
-        isEncrypted = headers['x-forwarded-proto'] === 'https';
+        request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '';
+        request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
         if (req.rawBody instanceof Buffer) rawBodyBuf = req.rawBody;
         else if (req.rawBody) rawBodyBuf = Buffer.from(req.rawBody);
         break;
 
       case 'gcp':
-        method = event.method || event.httpMethod;
-        url = event.url ||
+        request.method = event.method || event.httpMethod;
+        request.url = event.url ||
           (event.path + (event.query ? '?' + new URLSearchParams(event.query).toString() : ''));
-        headers = event.headers || {};
-        query = event.query || {};
-        pathParams = event.params || {};
-        cookies = headers.cookie
-          ? headers.cookie.split(';').map(c => c.trim())
+        request.headers = event.headers || {};
+        request.query = event.query || {};
+        request.pathParams = event.params || {};
+        request.cookies = request.headers.cookie
+          ? request.headers.cookie.split(';').map(c => c.trim())
           : [];
-        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '';
-        isEncrypted = headers['x-forwarded-proto'] === 'https';
+        request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '';
+        request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
         break;
 
       default:
-        method = event.method || 'GET';
-        url = event.url || '/';
-        headers = event.headers || {};
-        query = event.rawQueryString || {};
-        pathParams = event.params || {};
-        cookies = headers.cookie
-          ? headers.cookie.split(';').map(c => c.trim())
+        request.method = event.method || 'GET';
+        request.url = event.url || '/';
+        request.headers = event.headers || {};
+        request.query = event.rawQueryString || {};
+        request.pathParams = event.params || {};
+        request.cookies = request.headers.cookie
+          ? request.headers.cookie.split(';').map(c => c.trim())
           : [];
-        remoteAddress = headers['x-forwarded-for']?.split(',')[0] || '127.0.0.1';
-        isEncrypted = headers['x-forwarded-proto'] === 'https';
+        request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '127.0.0.1';
+        request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
     }
 
-    if (!headers.cookie && cookies.length > 0) {
-      headers.cookie = cookies.join('; ');
-    }
 
-    return {
-      method,
-      url,
-      headers,
-      query,
-      pathParams,
-      cookies,
-      rawBodyBuf,
-      remoteAddress,
-      isEncrypted
-    };
+    if (!request.headers.cookie && request.cookies.length > 0) {
+      request.headers.cookie = request.cookies.join('; ');
+    }
+    return request;
   }
 }
 
