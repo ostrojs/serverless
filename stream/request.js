@@ -59,7 +59,7 @@ class Request extends IncomingMessage {
 
       this.push(rawBodyBuf);
     }
-    this.push(null); // always end the stream
+    this.push(null);
 
     this.body = rawBodyBuf;
 
@@ -96,6 +96,19 @@ class Request extends IncomingMessage {
               request.headers['x-forwarded-for']?.split(',')[0] || '';
             request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
 
+            break;
+          case 'lambda-url':
+            request.method = event.requestContext?.http?.method || 'GET';
+            request.url = event.rawPath + (event.rawQueryString ? `?${event.rawQueryString}` : '');
+            request.headers = event.headers || {};
+            request.query = event.rawQueryString
+              ? Object.fromEntries(new URLSearchParams(event.rawQueryString))
+              : {};
+            request.pathParams = event.pathParameters || {};
+            request.cookies = event.cookies || [];
+            request.remoteAddress = event.requestContext?.http?.sourceIp ||
+              request.headers['x-forwarded-for']?.split(',')[0] || '';
+            request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
             break;
 
           case 'rest':
