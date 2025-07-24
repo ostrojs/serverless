@@ -11,11 +11,8 @@ class Serverless {
 				return handler(event, context);
 			}
 		})
-		Object.defineProperty(this, "$platform", {
-			value: serverless?.platform || "generic",
-		})
-		Object.defineProperty(this, "$getwayType", {
-			value: serverless?.getway,
+		Object.defineProperty(this, "$config", {
+			value: serverless
 		})
 	}
 
@@ -64,8 +61,8 @@ class Serverless {
 		}
 		return (event, context) => {
 			return new Promise((resolve) => {
-				const request = new this.$request(new this.$streamRequest(event, context, this.$platform, this.$getwayType));
-				const response = new this.$response(new this.$streamResponse(resolve, this.$platform, this.$getwayType))
+				const request = new this.$request(new this.$streamRequest(event, context, this.$config.platform, this.$config.getway));
+				const response = new this.$response(new this.$streamResponse(resolve, this.$config.platform, this.$config.getway))
 				Object.defineProperty(response, 'request', { value: request })
 				this.$handler(request, response, (err) => {
 					this.next(err, resolve);
