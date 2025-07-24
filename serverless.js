@@ -3,20 +3,20 @@ const StreamRequest = require('./stream/request');
 const StreamResponse = require('./stream/response');
 
 class Serverless {
-	constructor(streamRequest = StreamRequest, streamResponse = StreamResponse) {
-		this.stream(streamRequest, streamResponse);
+	constructor({ serverless }) {
+		this.stream();
 		const handler = this.handle()
 		Object.defineProperty(this, "handler", {
 			value: (event, context) => {
 				return handler(event, context);
 			}
 		})
-		Object.defineProperty(this, "$plateform", {
-			value: 'generic',
+		Object.defineProperty(this, "$config", {
+			value: serverless
 		})
 	}
 
-	stream(request, response) {
+	stream(request = StreamRequest, response = StreamResponse) {
 		if (typeof request != 'function') {
 			throw new Error('Request class must be function/class');
 		}
@@ -27,13 +27,11 @@ class Serverless {
 			$streamRequest: {
 				value: request,
 				writable: true,
-				configurable: true,
 				enumerable: false
 			},
 			$streamResponse: {
 				value: response,
 				writable: true,
-				configurable: true,
 				enumerable: false
 			}
 		});
@@ -63,18 +61,14 @@ class Serverless {
 		}
 		return (event, context) => {
 			return new Promise((resolve) => {
-				const request = new this.$request(new this.$streamRequest(event, context, this.$platform));
-				const response = new this.$response(new this.$streamResponse(resolve, this.$platform))
-				Object.defineProperty(response, 'req', { value: request })
+				const request = new this.$request(new this.$streamRequest(event, context, this.$config.platform, this.$config.getway));
+				const response = new this.$response(new this.$streamResponse(resolve, this.$config.platform, this.$config.getway))
+				Object.defineProperty(response, 'request', { value: request })
 				this.$handler(request, response, (err) => {
 					this.next(err, resolve);
 				});
 			});
 		};
-	}
-
-	platform(platform) {
-		this.$platform = platform;
 	}
 
 	entry(entryPath) {
