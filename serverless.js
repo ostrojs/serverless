@@ -3,7 +3,7 @@ const StreamRequest = require('./stream/request');
 const StreamResponse = require('./stream/response');
 
 class Serverless {
-	constructor(config) {
+	constructor({ serverless }) {
 		this.stream();
 		const handler = this.handle()
 		Object.defineProperty(this, "handler", {
@@ -12,10 +12,10 @@ class Serverless {
 			}
 		})
 		Object.defineProperty(this, "$platform", {
-			value: config?.serverless?.platform || "generic",
+			value: serverless?.platform || "generic",
 		})
 		Object.defineProperty(this, "$getwayType", {
-			value: config?.serverless?.getway,
+			value: serverless?.getway,
 		})
 	}
 
