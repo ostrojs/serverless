@@ -70,3 +70,13 @@ exports.normalizeHeaders = function normalizeHeaders(headers, platform, subtype 
   }
   return normalized;
 }
+
+exports.resolveWithRequire = function resolveWithRequire(input, baseDir = process.cwd()) {
+  const parts = input.split('.');
+  const filePath = path.join(baseDir, ...parts.slice(0, -1)); // exclude handler
+  try {
+    return require.resolve(filePath);
+  } catch (err) {
+    return null; // or throw err for more detail
+  }
+}
