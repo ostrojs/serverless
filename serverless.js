@@ -14,7 +14,6 @@ class Serverless {
 				value: serverless
 			}
 		});
-
 		this.entry(resolveWithRequire(serverless.handler))
 	}
 
