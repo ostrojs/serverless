@@ -4,7 +4,13 @@ const { normalizeHeaders } = require('../utils');
 
 class Response extends ServerResponse {
   constructor(resolve, platform, getwayType) {
-    super({ writable: true } instanceof Writable ? { writable: true } : new Writable());
+    const dummyWritable = new Writable({
+      write(chunk, encoding, callback) {
+        callback(); // noop
+      }
+    });
+
+    super(dummyWritable);
 
     this._resolve = resolve;
     this._chunks = [];
@@ -26,11 +32,14 @@ class Response extends ServerResponse {
   end(chunk, ...args) {
     if (chunk) this.write(chunk);
 
-    const result = this.toJSON();
+    try {
+      const result = this.toJSON();
+      this._resolve(result);
+    } catch (err) {
+      console.error('Failed to resolve serverless response:', err);
+    }
 
-    this._resolve(result);
-
-    return super.end(...args);
+    return super.end(null, ...args);
   }
 
   encode(encoding) {
@@ -52,21 +61,24 @@ class Response extends ServerResponse {
     const isBase64Encoded = this.isBase64Encoded();
     const body = isBase64Encoded ? buffer.toString('base64') : buffer.toString('utf8');
 
-    const headers = normalizeHeaders(this.getHeaders(), this._platform, this._getwayType)
-    let cookies = '';
+    const headers = normalizeHeaders(this.getHeaders(), this._platform, this._getwayType);
+
+    headers['content-length'] = buffer.length;
+
+    let cookies = undefined;
     if (this.isPlatform('aws')) {
       const setCookieKey = Object.keys(headers).find(
         key => key.toLowerCase() === 'set-cookie'
       );
-      cookies = setCookieKey ? headers[setCookieKey] : undefined;
       if (setCookieKey) {
+        cookies = headers[setCookieKey];
         delete headers[setCookieKey];
       }
     }
 
-    const platform = this._platform;
     const statusCode = this.statusCode || 200;
-    switch (platform) {
+
+    switch (this._platform) {
       case 'azure':
         return {
           status: statusCode,
@@ -85,14 +97,14 @@ class Response extends ServerResponse {
           headers,
           body,
           cookies,
-          isBase64Encoded
-        }
+          isBase64Encoded,
+        };
       default:
         return {
           statusCode,
           headers,
           body,
-          isBase64Encoded
+          isBase64Encoded,
         };
     }
   }
