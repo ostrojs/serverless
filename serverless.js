@@ -1,19 +1,20 @@
-const { values } = require('lodash');
+
 const StreamRequest = require('./stream/request');
 const StreamResponse = require('./stream/response');
-
+const { resolveWithRequire } = require("./utils")
 class Serverless {
 	constructor({ serverless }) {
 		this.stream();
 		const handler = this.handle()
-		Object.defineProperty(this, "handler", {
-			value: (event, context) => {
-				return handler(event, context);
+		Object.defineProperties(this, {
+			handler: {
+				value: (event, context) => handler(event, context)
+			},
+			$serverless: {
+				value: serverless
 			}
-		})
-		Object.defineProperty(this, "$config", {
-			value: serverless
-		})
+		});
+		this.entry(resolveWithRequire(serverless.handler))
 	}
 
 	stream(request = StreamRequest, response = StreamResponse) {
@@ -56,25 +57,24 @@ class Serverless {
 	}
 
 	handle() {
-		if (!this.$entryPath) {
-			this.loadMainModule(process.cwd() + '/serverless.js');
-		}
 		return (event, context) => {
 			return new Promise((resolve) => {
-				const request = new this.$request(new this.$streamRequest(event, context, this.$config.platform, this.$config.getway));
-				const response = new this.$response(new this.$streamResponse(resolve, this.$config.platform, this.$config.getway))
+				const serverlessPlateform = this.$serverless.platform || "generic";
+				const serverlessGetway = this.$serverless.getway;
+				const request = new this.$request(new this.$streamRequest(event, context, serverlessPlateform, serverlessGetway));
+				const response = new this.$response(new this.$streamResponse(resolve, serverlessPlateform, serverlessGetway))
 				Object.defineProperty(response, 'request', { value: request })
 				this.$handler(request, response, (err) => {
-					this.next(err, resolve);
+					response.send(err)
 				});
 			});
 		};
 	}
 
 	entry(entryPath) {
-		this.$entryPath = entryPath;
 		this.loadMainModule(entryPath);
 	}
+	
 	loadMainModule(mainModulePath) {
 		const mainPath = path.resolve(mainModulePath);
 		const mainModule = require(mainPath);
@@ -89,20 +89,6 @@ class Serverless {
 
 		return mainModule;
 	}
-
-	next(err, resolve) {
-		if (err) {
-			resolve({
-				statusCode: 500,
-				body: JSON.stringify({ message: 'Internal Server Error' }),
-			});
-		} else {
-			resolve({
-				statusCode: 404,
-				body: JSON.stringify({ message: 'Not Found' }),
-			});
-		}
-	};
 }
 
 module.exports = Serverless;
