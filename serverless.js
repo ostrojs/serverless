@@ -8,12 +8,13 @@ class Serverless {
 		const handler = this.handle()
 		Object.defineProperties(this, {
 			handler: {
-				value: (event, context) => handler(event, context)
+				value: handler
 			},
-			$serverless: {
+			$config: {
 				value: serverless
 			}
 		});
+
 		this.entry(resolveWithRequire(serverless.handler))
 	}
 
@@ -59,8 +60,8 @@ class Serverless {
 	handle() {
 		return (event, context) => {
 			return new Promise((resolve) => {
-				const serverlessPlateform = this.$serverless.platform || "generic";
-				const serverlessGetway = this.$serverless.getway;
+				const serverlessPlateform = this.$config.platform || "generic";
+				const serverlessGetway = this.$config.getway;
 				const request = new this.$request(new this.$streamRequest(event, context, serverlessPlateform, serverlessGetway));
 				const response = new this.$response(new this.$streamResponse(resolve, serverlessPlateform, serverlessGetway))
 				Object.defineProperty(response, 'request', { value: request })
@@ -74,7 +75,7 @@ class Serverless {
 	entry(entryPath) {
 		this.loadMainModule(entryPath);
 	}
-	
+
 	loadMainModule(mainModulePath) {
 		const mainPath = path.resolve(mainModulePath);
 		const mainModule = require(mainPath);
