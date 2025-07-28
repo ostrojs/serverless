@@ -32,13 +32,9 @@ class Response extends ServerResponse {
   end(chunk, ...args) {
     if (chunk) this.write(chunk);
 
-    try {
-      const result = this.toJSON();
-      this._resolve(result);
-    } catch (err) {
-      console.error('Failed to resolve serverless response:', err);
-    }
-
+    const result = this.toJSON();
+    this._resolve(result);
+   
     return super.end(null, ...args);
   }
 
