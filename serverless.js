@@ -61,7 +61,7 @@ class Serverless {
 		return (event, context) => {
 			return new Promise((resolve) => {
 				const serverlessPlateform = this.$config.platform || "generic";
-				const serverlessGetway = this.$config.getway;
+				const serverlessGetway = this.$config.gateway;
 				const request = new this.$request(new this.$streamRequest(event, context, serverlessPlateform, serverlessGetway));
 				const response = new this.$response(new this.$streamResponse(resolve, serverlessPlateform, serverlessGetway))
 				Object.defineProperty(response, 'request', { value: request })
