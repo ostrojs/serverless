@@ -1,31 +1,93 @@
-const { IncomingMessage } = require('http');
-const { URLSearchParams } = require('url');
-const { Readable } = require('stream');
-const { Duplex } = require('stream');
+import { IncomingMessage } from 'http';
+import { Duplex } from 'stream';
+import { URLSearchParams } from 'url';
+
+interface MockSocketOptions {
+  remoteAddress?: string;
+  encrypted?: boolean;
+}
 
 class MockSocket extends Duplex {
-  constructor(options = {}) {
+  _remoteAddress: string;
+  encrypted: boolean;
+
+  /**
+   * Create a new MockSocket instance.
+   *
+   * @param options - Socket configuration options.
+   */
+  constructor(options: MockSocketOptions = {}) {
     super();
     this._remoteAddress = options.remoteAddress || '';
     this.encrypted = options.encrypted || false;
   }
 
-  get remoteAddress() {
+  /**
+   * Get the remote IP address.
+   */
+  get remoteAddress(): string {
     return this._remoteAddress;
   }
 
-  setRemoteAddress(addr) {
+  /**
+   * Set the remote IP address.
+   *
+   * @param addr - Remote IP address.
+   */
+  setRemoteAddress(addr: string): void {
     this._remoteAddress = addr;
   }
 
-  _read() { }
-  _write(chunk, encoding, callback) {
+  /**
+   * Dummy read implementation.
+   */
+  override _read(): void {}
+
+  /**
+   * Dummy write implementation.
+   *
+   * @param _chunk - Data chunk.
+   * @param _encoding - String encoding.
+   * @param callback - Completion callback.
+   */
+  override _write(_chunk: unknown, _encoding: BufferEncoding | string, callback: (error?: Error | null) => void): void {
     callback();
   }
 }
 
+interface NormalizedRequest {
+  method: string | null;
+  url: string | null;
+  headers: Record<string, any> | null;
+  query: Record<string, any> | null;
+  pathParams: Record<string, any> | null;
+  cookies?: string[];
+  rawBodyBuf: Buffer | null;
+  remoteAddress: string;
+  isEncrypted: boolean;
+}
+
 class Request extends IncomingMessage {
-  constructor(event, context = {}, platform, getwayType) {
+  event: any;
+  context: Record<string, any>;
+  query: Record<string, any>;
+  params: Record<string, any>;
+  body: Buffer | null;
+
+  /**
+   * Create a new Request instance wrapping a serverless event.
+   *
+   * @param event - Serverless trigger event payload.
+   * @param context - Execution context from cloud provider.
+   * @param platform - Cloud platform name.
+   * @param getwayType - Gateway or trigger subtype.
+   */
+  constructor(
+    event: any = {},
+    context: Record<string, any> = {},
+    platform?: string | null,
+    getwayType?: string | null
+  ) {
     const {
       method,
       url,
@@ -36,12 +98,13 @@ class Request extends IncomingMessage {
       remoteAddress,
       isEncrypted
     } = Request._normalize(event, context, platform, getwayType);
+
     const mockSocket = new MockSocket({
       remoteAddress,
       encrypted: isEncrypted
     });
 
-    super(mockSocket);
+    super(mockSocket as any);
 
     this.event = event;
     this.context = context;
@@ -56,29 +119,41 @@ class Request extends IncomingMessage {
     this.httpVersionMinor = 1;
 
     if (rawBodyBuf?.length) {
-
       this.push(rawBodyBuf);
     }
     this.push(null);
 
     this.body = rawBodyBuf;
-
   }
 
-  static _normalize(event, context, platform, getwayType) {
+  /**
+   * Normalize cloud-provider specific event and context into a standard HTTP request representation.
+   *
+   * @param event - Serverless trigger event payload.
+   * @param context - Cloud context object.
+   * @param platform - Platform identifier (aws, gcp, azure, generic).
+   * @param getwayType - Gateway type (http, lambda-url, rest).
+   * @returns Normalized request data.
+   */
+  static _normalize(
+    event: any = {},
+    context: Record<string, any> = {},
+    platform?: string | null,
+    getwayType?: string | null
+  ): NormalizedRequest {
     const request = {
       method: 'GET',
       url: '/',
-      headers: {},
-      query: {},
-      pathParams: {},
-      cookies: [],
-      rawBodyBuf: event.body ? (event.isBase64Encoded
+      headers: {} as Record<string, any>,
+      query: {} as Record<string, any>,
+      pathParams: {} as Record<string, any>,
+      cookies: [] as string[],
+      rawBodyBuf: event?.body ? (event.isBase64Encoded
         ? Buffer.from(event.body, 'base64')
         : Buffer.from(event.body)) : Buffer.alloc(0),
       remoteAddress: '',
       isEncrypted: false
-    }
+    };
 
     switch (platform) {
       case 'aws':
@@ -95,8 +170,8 @@ class Request extends IncomingMessage {
             request.remoteAddress = event.requestContext?.http?.sourceIp ||
               request.headers['x-forwarded-for']?.split(',')[0] || '';
             request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
-
             break;
+
           case 'lambda-url':
             request.method = event.requestContext?.http?.method || 'GET';
             request.url = event.rawPath + (event.rawQueryString ? `?${event.rawQueryString}` : '');
@@ -118,7 +193,7 @@ class Request extends IncomingMessage {
             request.query = event.queryStringParameters || {};
             request.pathParams = event.pathParameters || {};
             request.cookies = request.headers.Cookie
-              ? request.headers.Cookie.split(';').map(c => c.trim())
+              ? request.headers.Cookie.split(';').map((c: string) => c.trim())
               : [];
             request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '';
             request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
@@ -126,22 +201,22 @@ class Request extends IncomingMessage {
         }
         break;
 
-
-      case 'azure':
-        const req = context.req || event;
+      case 'azure': {
+        const req: any = context.req || event;
         request.method = req.method;
         request.url = req.url;
         request.headers = req.headers || {};
         request.query = req.query || {};
         request.pathParams = req.params || {};
         request.cookies = request.headers.cookie
-          ? request.headers.cookie.split(';').map(c => c.trim())
+          ? request.headers.cookie.split(';').map((c: string) => c.trim())
           : [];
         request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '';
         request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
-        if (req.rawBody instanceof Buffer) rawBodyBuf = req.rawBody;
-        else if (req.rawBody) rawBodyBuf = Buffer.from(req.rawBody);
+        if (req.rawBody instanceof Buffer) request.rawBodyBuf = req.rawBody;
+        else if (req.rawBody) request.rawBodyBuf = Buffer.from(req.rawBody);
         break;
+      }
 
       case 'gcp':
         request.method = event.method || event.httpMethod;
@@ -151,7 +226,7 @@ class Request extends IncomingMessage {
         request.query = event.query || {};
         request.pathParams = event.params || {};
         request.cookies = request.headers.cookie
-          ? request.headers.cookie.split(';').map(c => c.trim())
+          ? request.headers.cookie.split(';').map((c: string) => c.trim())
           : [];
         request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '';
         request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
@@ -164,12 +239,11 @@ class Request extends IncomingMessage {
         request.query = event.rawQueryString || {};
         request.pathParams = event.params || {};
         request.cookies = request.headers.cookie
-          ? request.headers.cookie.split(';').map(c => c.trim())
+          ? request.headers.cookie.split(';').map((c: string) => c.trim())
           : [];
         request.remoteAddress = request.headers['x-forwarded-for']?.split(',')[0] || '127.0.0.1';
         request.isEncrypted = request.headers['x-forwarded-proto'] === 'https';
     }
-
 
     if (!request.headers.cookie && request.cookies.length > 0) {
       request.headers.cookie = request.cookies.join('; ');
@@ -178,4 +252,7 @@ class Request extends IncomingMessage {
   }
 }
 
-module.exports = Request;
+(Request as any).__esModule = true;
+(Request as any).default = Request;
+
+export default Request;

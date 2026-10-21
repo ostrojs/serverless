@@ -1,5 +1,13 @@
-exports.normalizeHeadersGeneral = function normalizeHeaders(headers) {
-  const normalized = {};
+import { join } from 'path';
+
+/**
+ * Normalizes headers generally by joining array values with commas.
+ *
+ * @param headers - Key-value pair of headers.
+ * @returns Normalized headers object.
+ */
+export function normalizeHeadersGeneral(headers: Record<string, any>): Record<string, any> {
+  const normalized: Record<string, any> = {};
   for (const key in headers) {
     if (Array.isArray(headers[key])) {
       normalized[key] = headers[key].join(', ');
@@ -9,13 +17,26 @@ exports.normalizeHeadersGeneral = function normalizeHeaders(headers) {
   }
   return normalized;
 }
-exports.normalizeHeaders = function normalizeHeaders(headers, platform, subtype = null) {
+
+/**
+ * Normalizes headers according to target serverless platform and subtype.
+ *
+ * @param headers - Incoming headers object.
+ * @param platform - Target serverless platform identifier.
+ * @param subtype - Optional platform-specific subtype or gateway variant.
+ * @returns Lowercased and normalized headers object.
+ */
+export function normalizeHeaders(
+  headers: Record<string, any> | null | undefined | unknown,
+  platform?: string | null,
+  subtype: string | null = null
+): Record<string, any> {
   if (!headers || typeof headers !== 'object') return {};
 
-  const normalized = {};
+  const normalized: Record<string, any> = {};
 
   // Detect whether array headers are allowed
-  const supportsArray = (() => {
+  const supportsArray: boolean = (() => {
     switch (platform) {
       case 'aws':
         switch (subtype) {
@@ -46,12 +67,14 @@ exports.normalizeHeaders = function normalizeHeaders(headers, platform, subtype 
     }
   })();
 
-  // Normalize all headers to lowercase
-  for (const key in headers) {
-    if (!Object.prototype.hasOwnProperty.call(headers, key)) continue;
+  const headerObj = headers as Record<string, any>;
 
-    const lowerKey = key.toLowerCase();
-    const value = headers[key];
+  // Normalize all headers to lowercase
+  for (const key in headerObj) {
+    if (!Object.prototype.hasOwnProperty.call(headerObj, key)) continue;
+
+    const lowerKey: string = key.toLowerCase();
+    const value: any = headerObj[key];
 
     if (Array.isArray(value)) {
       if (supportsArray) {
@@ -71,12 +94,19 @@ exports.normalizeHeaders = function normalizeHeaders(headers, platform, subtype 
   return normalized;
 }
 
-exports.resolveWithRequire = function resolveWithRequire(input, baseDir = process.cwd()) {
-  const parts = input.split('.');
-  const filePath = path.join(baseDir, ...parts.slice(0, -1)); // exclude handler
+/**
+ * Resolves a module file path using Node's require resolution.
+ *
+ * @param input - Dot-separated module path with handler name at the end.
+ * @param baseDir - Directory from which to resolve.
+ * @returns Resolved absolute file path, or null if resolution fails.
+ */
+export function resolveWithRequire(input: string, baseDir: string = process.cwd()): string | null {
+  const parts: string[] = input.split('.');
+  const filePath: string = join(baseDir, ...parts.slice(0, -1)); // exclude handler
   try {
     return require.resolve(filePath);
-  } catch (err) {
+  } catch {
     return null; // or throw err for more detail
   }
 }
