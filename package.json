@@ -1,6 +1,6 @@
 {
     "name": "@ostro/serverless",
-    "version": "2.0.0-alpha.1",
+    "version": "2.0.0-alpha.2",
     "description": "Serverless module for OstroJS",
     "main": "build/serverless.js",
     "scripts": {
@@ -30,17 +30,17 @@
         "url": "https://github.com/ostrojs/serverless/issues"
     },
     "homepage": "https://github.com/ostrojs/serverless#readme",
-    "types": "build/serverless.d.ts",
+    "types": "./build/types/serverless.d.ts",
     "files": [
         "build"
     ],
     "exports": {
         ".": {
-            "types": "./build/serverless.d.ts",
+            "types": "./build/types/serverless.d.ts",
             "default": "./build/serverless.js"
         },
         "./*": {
-            "types": "./build/*.d.ts",
+            "types": "./build/types/*.d.ts",
             "default": "./build/*.js"
         }
     },
