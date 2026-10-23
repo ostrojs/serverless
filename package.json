@@ -1,13 +1,14 @@
 {
     "name": "@ostro/serverless",
-    "version": "2.0.0-alpha.2",
+    "version": "2.0.0-alpha.3",
     "description": "Serverless module for OstroJS",
     "main": "build/serverless.js",
     "scripts": {
         "test": "npx c8 npx jest",
-        "build": "tsc -p tsconfig.build.json && node scripts/build.js",
+        "build": "npm run lint:check && tsc -p tsconfig.build.json && node scripts/build.js",
         "prepublishOnly": "npm run build",
-        "clean": "rm -rf build coverage"
+        "clean": "rm -rf build coverage",
+        "lint:check": "tsc --noEmit -p tsconfig.build.json"
     },
     "engines": {
         "node": ">=18.0.0"
@@ -52,7 +53,7 @@
         "jest": "^30.5.2",
         "ts-jest": "^29.4.15",
         "ts-node": "^10.9.2",
-        "@ostro/builder": "^2.0.0-alpha.1"
+        "@ostro/builder": "^2.0.0-alpha.2"
     },
     "overrides": {
         "sprintf-js": "^1.1.3",
