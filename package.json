@@ -1,8 +1,8 @@
 {
     "name": "@ostro/serverless",
-    "version": "2.0.0-alpha.4",
+    "version": "2.0.0-alpha.5",
     "description": "Serverless module for OstroJS",
-    "main": "build/serverless.js",
+    "main": "serverless.js",
     "scripts": {
         "test": "npx c8 npx jest",
         "build": "npm run lint:check && tsc -p tsconfig.build.json && node scripts/build.js",
@@ -31,18 +31,15 @@
         "url": "https://github.com/ostrojs/serverless/issues"
     },
     "homepage": "https://github.com/ostrojs/serverless#readme",
-    "types": "./build/types/serverless.d.ts",
-    "files": [
-        "build"
-    ],
+    "types": "types/serverless.d.ts",
     "exports": {
         ".": {
-            "types": "./build/types/serverless.d.ts",
-            "default": "./build/serverless.js"
+            "types": "./types/serverless.d.ts",
+            "default": "./serverless.js"
         },
         "./*": {
-            "types": "./build/types/*.d.ts",
-            "default": "./build/*.js"
+            "types": "./types/*.d.ts",
+            "default": "./*.js"
         }
     },
     "devDependencies": {
@@ -53,7 +50,7 @@
         "jest": "^30.5.2",
         "ts-jest": "^29.4.15",
         "ts-node": "^10.9.2",
-        "@ostro/builder": "^2.0.0-alpha.3"
+        "@ostro/builder": "^2.0.0-alpha.4"
     },
     "overrides": {
         "sprintf-js": "^1.1.3",
