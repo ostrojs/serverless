@@ -1,14 +1,15 @@
-import { IncomingMessage } from 'http';
-import { Duplex } from 'stream';
-import { URLSearchParams } from 'url';
+import { IncomingMessage } from 'node:http';
+import { Socket } from 'node:net';
+import { Duplex } from 'node:stream';
+import { URLSearchParams } from 'node:url';
 
 interface MockSocketOptions {
   remoteAddress?: string;
   encrypted?: boolean;
 }
 
-class MockSocket extends Duplex {
-  _remoteAddress: string;
+class MockSocket extends Socket {
+  _remoteAddress: string = '';
   encrypted: boolean;
 
   /**
@@ -18,15 +19,8 @@ class MockSocket extends Duplex {
    */
   constructor(options: MockSocketOptions = {}) {
     super();
-    this._remoteAddress = options.remoteAddress || '';
     this.encrypted = options.encrypted || false;
-  }
-
-  /**
-   * Get the remote IP address.
-   */
-  get remoteAddress(): string {
-    return this._remoteAddress;
+    this.setRemoteAddress(options.remoteAddress || '');
   }
 
   /**
@@ -36,6 +30,11 @@ class MockSocket extends Duplex {
    */
   setRemoteAddress(addr: string): void {
     this._remoteAddress = addr;
+    Object.defineProperty(this, 'remoteAddress', {
+      value: addr,
+      configurable: true,
+      writable: true
+    });
   }
 
   /**
@@ -68,6 +67,8 @@ interface NormalizedRequest {
 }
 
 class Request extends IncomingMessage {
+  static __esModule: boolean = true;
+  static default: typeof Request = Request;
   event: any;
   context: Record<string, any>;
   query: Record<string, any>;
@@ -104,7 +105,7 @@ class Request extends IncomingMessage {
       encrypted: isEncrypted
     });
 
-    super(mockSocket as any);
+    super(mockSocket);
 
     this.event = event;
     this.context = context;
@@ -251,8 +252,5 @@ class Request extends IncomingMessage {
     return request;
   }
 }
-
-(Request as any).__esModule = true;
-(Request as any).default = Request;
 
 export default Request;

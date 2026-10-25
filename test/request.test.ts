@@ -1,3 +1,4 @@
+import { describe, test, expect } from '@jest/globals';
 import Request from '../src/stream/request';
 
 describe('StreamRequest (stream/request.js)', () => {
@@ -330,11 +331,15 @@ describe('StreamRequest (stream/request.js)', () => {
         });
 
         test('invokes constructor and _normalize with default parameters', () => {
-            const req = new (Request as any)();
+            const RequestConstructor = Request as unknown as {
+                new (event?: unknown, context?: unknown): Request;
+                _normalize: (event?: unknown) => { method: string; url: string };
+            };
+            const req = new RequestConstructor();
             expect(req.method).toBe('GET');
             expect(req.url).toBe('/');
 
-            const norm = (Request as any)._normalize();
+            const norm = RequestConstructor._normalize();
             expect(norm.method).toBe('GET');
             expect(norm.url).toBe('/');
         });
