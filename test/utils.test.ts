@@ -1,5 +1,6 @@
+import { describe, test, expect } from "@jest/globals";
 import { normalizeHeaders, normalizeHeadersGeneral, resolveWithRequire } from '../src/utils';
-import path from 'path';
+import path from 'node:path';
 
 describe('serverless utils.js', () => {
     describe('normalizeHeadersGeneral', () => {

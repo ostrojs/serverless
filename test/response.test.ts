@@ -1,5 +1,6 @@
+import { describe, test, expect } from '@jest/globals';
+import stream from 'node:stream';
 import Response from '../src/stream/response';
-import stream from 'stream';
 
 describe('StreamResponse (stream/response.js)', () => {
     test('writes string and buffer chunks, default base64 encoding', () => {

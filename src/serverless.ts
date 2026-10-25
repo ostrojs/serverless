@@ -1,4 +1,4 @@
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 import StreamRequest from './stream/request';
 import StreamResponse from './stream/response';
 import { resolveWithRequire } from './utils';
@@ -158,7 +158,7 @@ class Serverless {
       Object.defineProperty(require, 'main', descriptor);
     }
 
-    (process as any).mainModule = require.main;
+    (process as NodeJS.Process).mainModule = require.main;
 
     return mainModule;
   }

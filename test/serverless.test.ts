@@ -1,7 +1,8 @@
-import fs from 'fs';
+import { describe, test, expect, beforeAll, afterAll } from "@jest/globals";
+import fs from 'node:fs';
 import Serverless from '../src/serverless';
-import path from 'path';
-import Module from 'module';
+import path from 'node:path';
+import Module from 'node:module';
 
 describe('Serverless (serverless.js)', () => {
     const dummyModulePath = path.resolve(__dirname, 'fixtures/entryDummy.js');
@@ -166,7 +167,7 @@ describe('Serverless (serverless.js)', () => {
         const dummyConfig = { serverless: { handler: 'test.fixtures.entryDummy.main' } };
         const sls = new Serverless(dummyConfig);
 
-        const origLoad = (Module as any)._load;
+        const origLoad = (Module as unknown as { _load: unknown })._load;
         const mainPath = path.resolve(dummyModulePath);
 
         Module._load = function(request, parent, isMain) {

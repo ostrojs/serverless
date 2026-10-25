@@ -1,6 +1,14 @@
-import { ServerResponse } from 'http';
-import { Writable } from 'stream';
+import { IncomingMessage, ServerResponse } from 'node:http';
+import { Socket } from 'node:net';
+import { Writable } from 'node:stream';
 import { normalizeHeaders } from '../utils';
+
+class DummySocketStream extends Socket {
+  override write(_chunk: any, _encoding?: any, callback?: any): boolean {
+    if (typeof callback === 'function') callback();
+    return true;
+  }
+}
 
 class Response extends ServerResponse {
   _resolve: (value: unknown) => void;
@@ -18,13 +26,17 @@ class Response extends ServerResponse {
    * @param getwayType - Gateway or trigger subtype.
    */
   constructor(resolve: (value: unknown) => void, platform: any, getwayType: any) {
-    const dummyWritable: Writable = new Writable({
+    const dummyWritable = new Writable({
       write(_chunk: unknown, _encoding: BufferEncoding | string, callback: (error?: Error | null) => void): void {
         callback(); // noop
       }
     });
 
-    super(dummyWritable as any);
+    const dummySocket = new DummySocketStream();
+    Object.assign(dummySocket, dummyWritable);
+    const dummyReq = new IncomingMessage(dummySocket);
+
+    super(dummyReq);
 
     this._resolve = resolve;
     this._chunks = [];
